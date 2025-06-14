@@ -1,6 +1,6 @@
 resource "aws_iam_role" "github_actions_role" {
 
-  name = "GithubActionsRole"
+  name = var.role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -8,12 +8,12 @@ resource "aws_iam_role" "github_actions_role" {
       {
         Effect = "Allow",
         Principal = {
-          Federated = "arn:aws:iam::364777501483:oidc-provider/token.actions.githubusercontent.com"
+          Federated = "arn:aws:iam::${var.aws_account_id}:oidc-provider/token.actions.githubusercontent.com"
         },
         Action = "sts:AssumeRoleWithWebIdentity",
         Condition = {
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:exact84/rsschool-devops-course-tasks:*"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.repo_fullname}:*"
           },
           "StringEquals" : {
             "token.actions.githubusercontent.com:aud" : "sts.amazonaws.com"
