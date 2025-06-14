@@ -11,10 +11,9 @@
 
 ## Переменные
 
-- `backend_bucket` — имя S3 бакета
-- `backend_key` — путь к `.tfstate`
-- `aws_account_id` — ID твоего AWS аккаунта
-- `repo_fullname` — `owner/repo`
+- `role_name` — имя IAM роли для GitHub Actions
+- `aws_account_id` — ID AWS аккаунта
+- `repo_fullname` — репозиторий
 
 ---
 
@@ -27,7 +26,6 @@
 ## Структура проекта
 
 terraform-proj/  
-├── main.tf  
 ├── backend.tf  
 ├── iam-role.tf  
 ├── variables.tf  
