@@ -13,9 +13,21 @@
 
 - `role_name` — имя IAM роли для GitHub Actions
 - `aws_account_id` — ID AWS аккаунта
-- `repo_fullname` — репозиторий
+- `repo_fullname` — репозиторий в формате `owner/repo`
 
 ---
+
+## Использование
+
+1. Склонируйте репозиторий
+2. Инициализируйте Terraform:  
+terraform init
+
+3. Проверьте план:  
+terraform plan
+
+4. Примените инфраструктуру:  
+terraform apply
 
 ## MFA
 
@@ -26,9 +38,9 @@
 ## Структура проекта
 
 terraform-proj/  
-├── backend.tf  
-├── iam-role.tf  
-├── variables.tf  
-└── .github/  
-    └── workflows/  
-        └── deploy.yml  
+├─ backend.tf  
+├─ iam-role.tf  
+├─ variables.tf  
+└─ .github/  
+&nbsp;&nbsp;&nbsp;&nbsp;   └─ workflows/  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        └─ deploy.yml  

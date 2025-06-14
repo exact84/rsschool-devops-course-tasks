@@ -7,6 +7,7 @@ variable "role_name" {
 variable "aws_account_id" {
   type        = string
   description = "364777501483"
+  default     = "364777501483"
 }
 
 variable "repo_fullname" {

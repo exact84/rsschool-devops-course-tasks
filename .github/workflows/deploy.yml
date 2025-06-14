@@ -26,7 +26,7 @@ jobs:
           terraform_version: 1.8.2
 
       - name: Check formatting
-        run: terraform fmt -check -recursive
+        run: terraform fmt -check -diff -recursive
 
   terraform-plan:
     name: Terraform Plan
@@ -52,6 +52,8 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan
+        env:
+          TF_LOG: DEBUG
 
   terraform-apply:
     name: Terraform Apply
