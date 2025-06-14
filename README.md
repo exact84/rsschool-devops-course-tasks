@@ -14,6 +14,7 @@
 - `role_name` — имя IAM роли для GitHub Actions
 - `aws_account_id` — ID AWS аккаунта
 - `repo_fullname` — репозиторий в формате `owner/repo`
+- `aws_region` — регион AWS
 
 ---
 
