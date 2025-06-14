@@ -10,6 +10,7 @@
 ---
 
 ## Переменные
+описаны в variables.tf и храняться в Github Actions secrets
 
 - `role_name` — имя IAM роли для GitHub Actions
 - `aws_account_id` — ID AWS аккаунта
@@ -20,14 +21,21 @@
 
 ## Использование
 
+Инфраструктура разворачивается автоматически через GitHub Actions.
+Файл workflow: `.github/workflows/deploy.yml`.
+
+Для локальной проверки и отладки вы можете использовать Terraform вручную:
 1. Склонируйте репозиторий
-2. Инициализируйте Terraform:  
+
+2. Установите переменные окружения
+
+3. Инициализируйте Terraform:  
 terraform init
 
-3. Проверьте план:  
+4. Проверьте план:  
 terraform plan
 
-4. Примените инфраструктуру:  
+5. Примените инфраструктуру:  
 terraform apply
 
 ## MFA
