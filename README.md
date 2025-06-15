@@ -4,7 +4,6 @@
 
 Инфраструктура создаёт:
 - IAM роль (`GithubActionsRole`) для GitHub Actions с OIDC
-- S3 bucket для хранения Terraform состояния
 - CI/CD pipeline через GitHub Actions
 
 ---
