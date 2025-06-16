@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - task_1
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -66,7 +64,7 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/task_1' || github.event_name == 'workflow_dispatch'
     needs: terraform-plan
     steps:
       - name: Checkout code
@@ -84,7 +82,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Init
-        run: terraform 
+        run: terraform init
         env:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_repo_fullname: ${{ secrets.REPO_FULLNAME }}
