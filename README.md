@@ -1,49 +1,57 @@
 # Terraform GitHub Actions Infrastructure
 
-## Описание
+## Description
 
-Инфраструктура создаёт:
-- IAM роль (`GithubActionsRole`) для GitHub Actions с OIDC
-- CI/CD pipeline через GitHub Actions
-
----
-
-## Переменные
-описаны в variables.tf и храняться в Github Actions secrets
-
-- `role_name` — имя IAM роли для GitHub Actions
-- `aws_account_id` — ID AWS аккаунта
-- `repo_fullname` — репозиторий в формате `owner/repo`
-- `aws_region` — регион AWS
+The infrastructure creates:
+- IAM role (`GithubActionsRole`) for GitHub Actions with OIDC
+- CI/CD pipeline via GitHub Actions
 
 ---
 
-## Использование
+## Variables  
+defined in `variables.tf` and stored in GitHub Actions secrets
 
-Инфраструктура разворачивается автоматически через GitHub Actions.
-Файл workflow: `.github/workflows/deploy.yml`.
+- `role_name` — name of the IAM role for GitHub Actions  
+- `aws_account_id` — AWS account ID  
+- `repo_fullname` — repository in the format `owner/repo`  
+- `aws_region` — AWS region  
 
-Для локальной проверки и отладки вы можете использовать Terraform вручную:
-1. Склонируйте репозиторий
+---
 
-2. Установите переменные окружения
+## Usage
 
-3. Инициализируйте Terraform:  
-terraform init
+The infrastructure is deployed automatically via GitHub Actions.  
+Workflow file: `.github/workflows/deploy.yml`.
 
-4. Проверьте план:  
-terraform plan
+For local testing and debugging you can use Terraform manually:  
+1. Clone the repository  
 
-5. Примените инфраструктуру:  
-terraform apply
+2. Set environment variables  
+
+3. Initialize Terraform:  
+terraform init  
+
+4. Review the plan:  
+terraform plan  
+
+5. Apply the infrastructure:  
+terraform apply  
+
+---
 
 ## MFA
 
-В IAM-консоли создан пользователь с включённой многофакторной аутентификацией (MFA).
+An IAM user with Multi-Factor Authentication (MFA) is created in the IAM console.
 
 ---
 
-## Структура проекта
+## Note
+
+The S3 bucket for storing Terraform state created manually.
+
+---
+
+## Project structure
 
 terraform-proj/  
 ├─ backend.tf  
