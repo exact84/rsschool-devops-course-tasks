@@ -26,3 +26,10 @@ variable "azs" {
   description = "List of Availability Zones"
   default     = ["us-east-1a", "us-east-1b"]
 }
+
+// Ключ для подключения
+variable "key_name" {
+  description = "SSH Key name"
+  type        = string
+  default     = "k8s-key"
+}
