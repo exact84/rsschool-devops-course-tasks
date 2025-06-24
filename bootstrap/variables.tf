@@ -4,7 +4,7 @@ variable "region" {
 }
 
 variable "bucket_name" {
-  default = "your-unique-terraform-bucket"
+  default = "k8s-terraform-state-140484"
 }
 
 variable "table_name" {
