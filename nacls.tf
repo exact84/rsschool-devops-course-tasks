@@ -11,9 +11,34 @@ resource "aws_network_acl" "main" {
   }
 }
 
-resource "aws_network_acl_rule" "ingress_all_from_vpc" {
+# Allow SSH to bastion (from anywhere)
+resource "aws_network_acl_rule" "ingress_ssh_from_anywhere" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 100
+  egress         = false
+  protocol       = "6"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+# Allow incoming responses from internet (ephemeral ports)
+resource "aws_network_acl_rule" "ingress_ephemeral" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 110
+  egress         = false
+  protocol       = "6"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+
+# Allow internal VPC traffic (10.0.0.0/16)
+resource "aws_network_acl_rule" "ingress_from_vpc" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 120
   egress         = false
   protocol       = "-1"
   rule_action    = "allow"
@@ -22,24 +47,38 @@ resource "aws_network_acl_rule" "ingress_all_from_vpc" {
   to_port        = 0
 }
 
-resource "aws_network_acl_rule" "egress_all_to_anywhere" {
+# Allow outbound HTTPS (to internet)
+resource "aws_network_acl_rule" "egress_https" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 100
   egress         = true
-  protocol       = "-1"
+  protocol       = "6"
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
-  from_port      = 0
-  to_port        = 0
+  from_port      = 443
+  to_port        = 443
 }
 
-resource "aws_network_acl_rule" "ingress_ssh_from_anywhere" {
+# Allow outbound DNS (UDP 53)
+resource "aws_network_acl_rule" "egress_dns_udp" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 110
-  egress         = false
+  egress         = true
+  protocol       = "17" # UDP
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 53
+  to_port        = 53
+}
+
+# Allow outbound DNS (TCP fallback)
+resource "aws_network_acl_rule" "egress_dns_tcp" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 120
+  egress         = true
   protocol       = "6" # TCP
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
-  from_port      = 22
-  to_port        = 22
+  from_port      = 53
+  to_port        = 53
 }

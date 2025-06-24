@@ -36,7 +36,8 @@ terraform-proj/
 ├── terraform.tfvars # Variable values  
 └── .github/  
 &nbsp;&nbsp;└── workflows/  
-&nbsp;&nbsp;&nbsp;&nbsp;└── deploy.yml # GitHub Actions workflow  
+&nbsp;&nbsp;&nbsp;&nbsp;└── terraform.yml # GitHub Actions: check + plan + apply  
+&nbsp;&nbsp;&nbsp;&nbsp;└── terraform-destroy.yml # GitHub Actions: safe teardown  
 
 ---
 
@@ -48,6 +49,11 @@ terraform-proj/
 - SSH key pair (create in AWS Console or locally)
 
 ### Deploy the Infrastructure
+
+Creation S3:
+bootstrap:
+	cd bootstrap && terraform init && terraform apply -auto-approve
+
 
 ```
 terraform init
@@ -72,7 +78,7 @@ terraform apply
 
 ## GitHub Actions Pipeline
 
-GitHub Actions is configured to run on every `push` to the `main` and `task_2` and `pull_request` to the `main` branch.
+GitHub Actions is configured to run on every `pull_request` to the `main` branch.
 
 Workflow location:
 ```
@@ -82,12 +88,38 @@ Workflow location:
 Steps:
 - `terraform fmt` and `validate`
 - `terraform plan`
+- `terraform apply`
 
 ---
 
-## 🧹 Teardown
+## Backend (S3/DynamoDB) — Manual Bootstrap
 
-To destroy all AWS resources:
+Before using any Terraform commands or running the pipeline, you must manually create the backend for state and locking:
+
 ```
-terraform destroy
+make bootstrap
+```
+This will create the S3 bucket and DynamoDB table required for storing Terraform state and locks. **This step is required only once before the first deployment.**
+
+**Why manual?**
+- This approach prevents accidental loss of state/history and ensures full control over backend lifecycle.
+- Backend is not deleted automatically to keep the state and history for audit and safety.
+
+To destroy the backend (S3 + DynamoDB) manually:
+```
+make destroy-bootstrap
+```
+
+---
+
+## Infrastructure Teardown
+
+To delete all AWS resources (except backend), use the GitHub Actions workflow:
+- Go to GitHub → Actions → `Terraform Destroy` → Run workflow
+
+This will remove all infrastructure, but **the backend (S3/DynamoDB) will remain** for safety and traceability.
+
+To remove the backend completely, run:
+```
+make destroy-bootstrap
 ```
