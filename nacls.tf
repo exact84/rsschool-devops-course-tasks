@@ -82,3 +82,38 @@ resource "aws_network_acl_rule" "egress_dns_tcp" {
   from_port      = 53
   to_port        = 53
 }
+
+resource "aws_network_acl_rule" "egress_all" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 130
+  egress         = true
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 0
+  to_port        = 0
+}
+
+# Ingress ICMP from VPC
+resource "aws_network_acl_rule" "ingress_icmp" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 130
+  egress         = false
+  protocol       = "1" # ICMP
+  rule_action    = "allow"
+  cidr_block     = "10.0.0.0/16"
+  from_port      = 8
+  to_port        = -1
+}
+
+# Egress ICMP to VPC
+resource "aws_network_acl_rule" "egress_icmp" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 130
+  egress         = true
+  protocol       = "1" # ICMP
+  rule_action    = "allow"
+  cidr_block     = "10.0.0.0/16"
+  from_port      = -1
+  to_port        = -1
+}
