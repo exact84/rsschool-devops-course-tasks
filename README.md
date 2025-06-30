@@ -1,59 +1,15 @@
-# AWS VPC Infrastructure for Kubernetes (with Terraform)
 
-This project sets up the basic networking infrastructure required to deploy a Kubernetes (K8s) cluster on AWS using Terraform.
+# Kubernetes Cluster Setup on K3s in AWS
 
----
+## Project Overview
+This guide outlines the setup of a Kubernetes cluster using K3s, consisting of one master node and one worker node, deployed in separate private subnets within an AWS VPC. Access to the cluster is facilitated through a bastion host located in a public subnet.
 
-## Infrastructure Overview
+## Requirements and Preparation
 
-The Terraform code provisions:
+### 1. Deploy Kubernetes Cluster Infrastructure with Terraform
+The project includes Terraform configurations to create a VPC, private subnets for the master and worker nodes, EC2 instances for the master and worker, a bastion host, and necessary security settings.
 
-- ✅ A custom **VPC** (`k8s-vpc`)
-- ✅ 2 **Public subnets** (in `us-east-1a` and `us-east-1b`)
-- ✅ 2 **Private subnets** (in `us-east-1a` and `us-east-1b`)
-- ✅ An **Internet Gateway** for public internet access
-- ✅ A **NAT Gateway** for outbound internet access from private subnets
-- ✅ Proper **Routing tables** for public and private traffic flow
-- ✅ A **Bastion host** (jump box) for SSH access to private subnets
-- ✅ **Security Groups** to control instance access
-- ✅ **Network ACLs** for subnet-level traffic rules
-
----
-
-## File Structure
-
-terraform-proj/  
-├── main.tf # VPC and common resources  
-├── subnets.tf # Public and private subnets  
-├── routes.tf # Route tables and associations  
-├── nat.tf # NAT Gateway and EIP  
-├── bastion.tf # EC2 Bastion Host  
-├── security.tf # Security groups  
-├── nacls.tf # Network ACLs  
-├── private_instance.tf # Private instance  
-├── variables.tf # Input variables  
-├── outputs.tf # Useful output (e.g., bastion IP)  
-├── terraform.tfvars # Variable values  
-└── .github/  
-&nbsp;&nbsp;└── workflows/  
-&nbsp;&nbsp;&nbsp;&nbsp;└── terraform.yml # GitHub Actions: check + plan + apply  
-&nbsp;&nbsp;&nbsp;&nbsp;└── terraform-destroy.yml # GitHub Actions: safe teardown  
-
----
-
-## Getting Started
-
-### Prerequisites
-- [Terraform CLI](https://developer.hashicorp.com/terraform/downloads)
-- AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
-- SSH key pair (create in AWS Console or locally)
-
-### Deploy the Infrastructure
-
-Creation S3:
-bootstrap:
-	cd bootstrap && terraform init && terraform apply -auto-approve
-
+Run the following commands:
 
 ```
 terraform init
@@ -61,65 +17,96 @@ terraform plan
 terraform apply
 ```
 
-> `terraform apply` will create real AWS resources — charges may apply.
+### 2. SSH Key for Access
+An SSH key (`k8s-key.pem`) generated during the creation of EC2 instances in AWS is used to connect to the instances.
 
----
-
-## Connecting to the Bastion Host
-
-1. Use the output from `terraform apply` to get the bastion IP:
-   ```
-   ssh -i ~/.ssh/k8s-key.pem ec2-user@<BASTION_PUBLIC_IP>
-   ```
-
-2. From the bastion, you can SSH into private instances (once created).
-
----
-
-## GitHub Actions Pipeline
-
-GitHub Actions is configured to run on every `pull_request` to the `main` branch.
-
-Workflow location:
-```
-.github/workflows/terraform.yml
-```
-
-Steps:
-- `terraform fmt` and `validate`
-- `terraform plan`
-- `terraform apply`
-
----
-
-## Backend (S3/DynamoDB) — Manual Bootstrap
-
-Before using any Terraform commands or running the pipeline, you must manually create the backend for state and locking:
+### 3. Install kubectl on Local Machine (Windows)
+- Install [Chocolatey](https://chocolatey.org/install) if not already installed.
+- Open PowerShell as an administrator and run:
 
 ```
-make bootstrap
-```
-This will create the S3 bucket and DynamoDB table required for storing Terraform state and locks. **This step is required only once before the first deployment.**
-
-**Why manual?**
-- This approach prevents accidental loss of state/history and ensures full control over backend lifecycle.
-- Backend is not deleted automatically to keep the state and history for audit and safety.
-
-To destroy the backend (S3 + DynamoDB) manually:
-```
-make destroy-bootstrap
+choco install kubernetes-cli -y
 ```
 
 ---
 
-## Infrastructure Teardown
+## Deploying the Kubernetes Cluster
 
-To delete all AWS resources (except backend), use the GitHub Actions workflow:
-- Go to GitHub → Actions → `Terraform Destroy` → Run workflow
+### 1. Install K3s on the Master Node
+- Copy the SSH key and connect to the master EC2 instance.
+- Set appropriate permissions for the key.
+- Install the K3s server:
 
-This will remove all infrastructure, but **the backend (S3/DynamoDB) will remain** for safety and traceability.
-
-To remove the backend completely, run:
 ```
-make destroy-bootstrap
+curl -sfL https://get.k3s.io | sh -s - server
 ```
+
+- Retrieve the node token:
+
+```
+sudo cat /var/lib/rancher/k3s/server/node-token
+```
+---
+
+### 2. Install K3s Agent on the Worker Node
+- Connect to the worker EC2 instance via SSH.
+- Install the K3s agent, specifying the server URL and token:
+
+```
+curl -sfL https://get.k3s.io | K3S_URL=https://<MASTER_PRIVATE_IP>:6443 K3S_TOKEN=<NODE_TOKEN> sh -s - agent
+```
+---
+
+
+## Configuring Cluster Access from Local Machine
+
+### 1. Create an SSH Tunnel via Bastion Host
+Run the following command on your local machine to forward the port to the API server:
+
+```
+ssh -i path\to\k8s-key.pem -L 6443:<MASTER_PRIVATE_IP>:6443 ec2-user@<BASTION_PUBLIC_IP>
+```
+
+Keep this terminal window open to maintain the tunnel.
+
+### 2. Copy the kubeconfig File
+From the bastion host, retrieve the kubeconfig file from the master node and save it locally:
+
+```
+ssh -i path/to/k8s-key.pem ec2-user@<BASTION_PUBLIC_IP> "ssh ec2-user@<MASTER_PRIVATE_IP> 'sudo cat /etc/rancher/k3s/k3s.yaml'" > k3s.yaml
+```
+---
+
+
+### 3. Edit the kubeconfig File
+Open `k3s.yaml` in a text editor and update the `clusters.cluster.server` field to:
+
+```
+https://localhost:6443
+```
+---
+
+### 4. Set the KUBECONFIG Environment Variable (Windows PowerShell)
+
+```
+$env:KUBECONFIG = "C:\pathTo\k3s.yaml"
+```
+---
+
+### 5. Verify Access
+In the same session with the SSH tunnel active, check the list of nodes:
+
+```
+kubectl get nodes
+```
+
+If the nodes appear with a `Ready` status, the setup is successful.
+
+## Deploy a Workload
+Deploy a simple nginx application:
+
+```
+kubectl apply -f https://k8s.io/examples/pods/simple-pod.yaml
+kubectl get all --all-namespaces | grep nginx
+```
+---
