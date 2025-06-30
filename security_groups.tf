@@ -44,4 +44,11 @@ resource "aws_security_group" "private_sg" {
     cidr_blocks = ["10.0.0.0/16"]
   }
 
+  egress {
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
 }
