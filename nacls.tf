@@ -102,18 +102,40 @@ resource "aws_network_acl_rule" "ingress_icmp" {
   protocol       = "1" # ICMP
   rule_action    = "allow"
   cidr_block     = "10.0.0.0/16"
-  from_port      = 8
+  from_port      = -1 // Проблема века решена???
   to_port        = -1
 }
 
 # Egress ICMP to VPC
 resource "aws_network_acl_rule" "egress_icmp" {
   network_acl_id = aws_network_acl.main.id
-  rule_number    = 130
+  rule_number    = 140
   egress         = true
   protocol       = "1" # ICMP
   rule_action    = "allow"
   cidr_block     = "10.0.0.0/16"
   from_port      = -1
   to_port        = -1
+}
+
+resource "aws_network_acl_rule" "ingress_k8s_api" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 160
+  egress         = false
+  protocol       = "6" # TCP
+  rule_action    = "allow"
+  cidr_block     = "10.0.0.0/16"
+  from_port      = 6443
+  to_port        = 6443
+}
+
+resource "aws_network_acl_rule" "egress_k8s_api" {
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = 160
+  egress         = true
+  protocol       = "6" # TCP
+  rule_action    = "allow"
+  cidr_block     = "10.0.0.0/16"
+  from_port      = 6443
+  to_port        = 6443
 }
