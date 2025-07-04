@@ -1,7 +1,7 @@
 resource "aws_instance" "private" {
   count                  = 2
   ami                    = "ami-0c101f26f147fa7fd" # Amazon Linux 2 AMI
-  instance_type          = "t2.micro"
+  instance_type          = "t3.medium"
   subnet_id              = aws_subnet.private[count.index].id
   vpc_security_group_ids = [aws_security_group.private_sg.id]
   key_name               = var.key_name
