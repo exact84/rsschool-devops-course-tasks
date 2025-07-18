@@ -1,4 +1,4 @@
-# Flask App Helm Deployment
+# Flask App Helm Deployment Deployment via Jenkins Pipeline
 
 ## Project Structure
 
@@ -6,11 +6,42 @@
   - .helmignore
   - Dockerfile
   - main.py
+  - test_app.py
   - Chart.yaml
   - values.yaml
+  - sonarqube.yaml
   - requirements.txt
   - templates/
      - ... (deployment.yaml, service.yaml, etc.)
+
+
+## minikube and helm must be installed
+
+## Install Jenkins
+
+```
+helm install jenkins jenkins/jenkins --namespace default
+```
+
+for checking:
+```
+kubectl get pods -n jenkins
+```
+
+recieve password and addres for Jenkins Dashboard in the web browser:
+```
+get secret jenkins -n jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode
+minikube service jenkins --namespace jenkins --url
+```
+
+## Personal access token
+Create Personal access tokens (classic) in GitHub.
+Add it to Jenkins: “Manage Jenkins” → “Credentials” → (global) → “Add Credentials”
+
+
+
+
+
 
 ## Build and Publish Docker Image
 

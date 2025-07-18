@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "flask-app"
+        DOCKER_TAG = "latest"
+        REGISTRY = "docker.io/exact84"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-token', url: 'https://github.com/exact84/rsschool-devops-course-tasks.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $REGISTRY/$DOCKER_IMAGE:$DOCKER_TAG .'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'pip install -r requirements.txt'
+                sh 'pytest'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('sonarqube-token')
+            }
+            steps {
+                sh '''
+                sonar-scanner \
+                  -Dsonar.projectKey=myproject \
+                  -Dsonar.sources=. \
+                  -Dsonar.host.url=http://sonarqube:9000 \
+                  -Dsonar.login=$SONAR_TOKEN
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push $REGISTRY/$DOCKER_IMAGE:$DOCKER_TAG
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh 'helm upgrade --install myapp ./chart --namespace default'
+            }
+        }
+    }
+}
