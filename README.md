@@ -5,11 +5,13 @@
 - flask-app/
   - .helmignore
   - Dockerfile
+  - Jenkinsfile
   - main.py
   - test_app.py
   - Chart.yaml
   - values.yaml
   - sonarqube.yaml
+  - sonar-project.properties
   - requirements.txt
   - templates/
      - ... (deployment.yaml, service.yaml, etc.)
@@ -76,14 +78,6 @@ Add it to Jenkins: “Manage Jenkins” → “Credentials” → (global) → �
 
 ## Accessing the Application
 
-- **Recommended way for minikube:**
-  ```sh
-  minikube service flask-app
-  ```
-  This command will open a browser with the working address (e.g., http://127.0.0.1:63546/).
-
-- **NodePort (e.g., http://192.168.49.2:30202/):**
-  May not be accessible from outside the minikube VM on Windows/Mac. This is a minikube limitation, not your configuration.
 
 ## Uninstall the Application
 
@@ -92,7 +86,4 @@ helm uninstall flask-app
 ```
 
 ## Notes
-- For production, it is recommended to:
-   - Store the image in a public registry (e.g., DockerHub).
-   - Update values.yaml to set image.repository: exact84/flask-app and image.tag: latest.
-- The application is built with Flask and runs in development mode (suitable for demo, not for production).
+

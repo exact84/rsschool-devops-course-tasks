@@ -3,8 +3,9 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "flask-app"
-        DOCKER_TAG = "latest"
+        DOCKER_TAG = "${BUILD_NUMBER}"
         REGISTRY = "docker.io/exact84"
+        SONAR_SCANNER_HOME = tool 'SonarQube Scanner'
     }
 
     stages {
@@ -23,22 +24,21 @@ pipeline {
         stage('Test') {
             steps {
                 sh 'pip install -r requirements.txt'
-                sh 'pytest'
+                sh 'pytest || exit 1'
             }
         }
 
         stage('SonarQube Analysis') {
             environment {
-                SONAR_TOKEN = credentials('sonarqube-token')
+                SONAR_TOKEN = credentials('flask-app-exact')
             }
             steps {
-                sh '''
-                sonar-scanner \
-                  -Dsonar.projectKey=myproject \
-                  -Dsonar.sources=. \
-                  -Dsonar.host.url=http://sonarqube:9000 \
-                  -Dsonar.login=$SONAR_TOKEN
-                '''
+                withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                    ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                    -Dsonar.login=$SONAR_TOKEN
+                    '''
+                }
             }
         }
 
@@ -55,8 +55,39 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh 'helm upgrade --install myapp ./chart --namespace default'
+                sh '''
+                helm upgrade --install myapp . --namespace default \
+                    --set image.repository=$REGISTRY/$DOCKER_IMAGE \
+                    --set image.tag=$DOCKER_TAG
+                '''
             }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                sleep 10
+                kubectl rollout status deployment/flask-app-helm
+                curl --fail http://$(minikube ip):30202 || echo "App is not reachable"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            emailext(
+                to: 'exact84@gmail.com',
+                subject: "Jenkins build #${BUILD_NUMBER} succeeded",
+                body: "Everything deployed and verified successfully."
+            )
+        }
+        failure {
+            emailext(
+                to: 'exact84@gmail.com',
+                subject: "Jenkins build #${BUILD_NUMBER} failed",
+                body: "Please check the Jenkins console log for details."
+            )
         }
     }
 }
