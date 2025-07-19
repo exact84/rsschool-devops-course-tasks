@@ -23,6 +23,20 @@ pipeline {
             }
         }
 
+        stage('Build and Push Docker Image') {
+            steps {
+                script {
+                    sh '''
+                    sed "s|__IMAGE_TAG__|docker.io/exact84/flask-app:${BUILD_NUMBER}|g" k8s/kaniko-template.yaml > kaniko.yaml
+                    kubectl apply -f kaniko.yaml
+                    kubectl wait --for=condition=complete --timeout=300s pod/kaniko-build
+                    kubectl logs kaniko-build
+                    kubectl delete pod kaniko-build
+                    '''
+                }
+            }
+        }
+
         stage('Test') {
             steps {
                 sh 'pip install -r requirements.txt'
