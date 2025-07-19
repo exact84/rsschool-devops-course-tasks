@@ -1,8 +1,8 @@
 pipeline {
     agent any
-        options {
-            skipDefaultCheckout(true)
-        }
+    options {
+        skipDefaultCheckout(true)
+    }
     environment {
         DOCKER_IMAGE = "flask-app"
         DOCKER_TAG = "${BUILD_NUMBER}"
@@ -17,24 +17,90 @@ pipeline {
             }
         }
 
-        stage('Build and Push Docker Image') {
+        stage('Setup RBAC') {
             steps {
                 script {
-                    sh '''
-                    sed "s|__IMAGE_TAG__|docker.io/exact84/flask-app:${BUILD_NUMBER}|g" kaniko.yaml > kaniko.yaml
-                    kubectl apply -f kaniko.yaml
-                    kubectl wait --for=condition=complete --timeout=300s pod/kaniko-build
-                    kubectl logs kaniko-build
-                    kubectl delete pod kaniko-build
-                    '''
+                    sh 'kubectl delete pod kaniko-build -n jenkins --ignore-not-found'
+                    def rbacYaml = """
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kaniko-role
+  namespace: jenkins
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kaniko-rolebinding
+  namespace: jenkins
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: jenkins
+roleRef:
+  kind: Role
+  name: kaniko-role
+  apiGroup: rbac.authorization.k8s.io
+"""
+                    writeFile file: 'kaniko-rbac.yaml', text: rbacYaml
+                    sh 'kubectl apply -f kaniko-rbac.yaml'
                 }
             }
+        }    
+
+    stage('Build and Push Docker Image with Kaniko') {
+        steps {
+            script {
+                def kanikoYaml = """
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kaniko-build
+spec:
+  restartPolicy: Never
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:latest
+      args:
+        - "--dockerfile=flask-app/Dockerfile"
+        - "--context=git://github.com/exact84/rsschool-devops-course-tasks.git#refs/heads/task_6"
+        - "--destination=docker.io/exact84/flask-app:${BUILD_NUMBER}"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker/config.json
+          subPath: .dockerconfigjson
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: docker-config
+"""
+
+                writeFile file: 'kaniko.yaml', text: kanikoYaml
+
+                sh '''
+                kubectl apply -f kaniko.yaml
+                kubectl wait --for=condition=Ready --timeout=300s pod/kaniko-build
+                kubectl get pod kaniko-build -o jsonpath='{.status.phase}'
+                kubectl delete pod kaniko-build
+                '''
+            }
         }
+    }
 
         stage('Test') {
             steps {
-                sh 'pip install -r requirements.txt'
-                sh 'pytest || exit 1'
+                sh '''
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r flask-app/requirements.txt
+                pytest flask-app/ || exit 1
+                '''
             }
         }
 
@@ -43,24 +109,17 @@ pipeline {
                 SONAR_TOKEN = credentials('flask-app-exact')
             }
             steps {
-                withSonarQubeEnv('MySonarQube') {
-                    withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                        ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-                            -Dsonar.login=$SONAR_TOKEN
-                        '''
+                dir('flask-app') {
+                    withSonarQubeEnv('MySonarQube') {
+                        withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
+                            sh 'ls -l'
+                            sh 'cat sonar-project.properties'
+                            sh '''
+                            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
                     }
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker push $REGISTRY/$DOCKER_IMAGE:$DOCKER_TAG
-                    '''
                 }
             }
         }
