@@ -1,6 +1,8 @@
 pipeline {
     agent any
-
+        options {
+            skipDefaultCheckout(true)
+        }
     environment {
         DOCKER_IMAGE = "flask-app"
         DOCKER_TAG = "${BUILD_NUMBER}"
@@ -11,7 +13,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'github-token', url: 'https://github.com/exact84/rsschool-devops-course-tasks.git'
+                git branch: 'task_6', credentialsId: 'github-token', url: 'https://github.com/exact84/rsschool-devops-course-tasks.git'
             }
         }
 
@@ -33,11 +35,13 @@ pipeline {
                 SONAR_TOKEN = credentials('flask-app-exact')
             }
             steps {
-                withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                    ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-                    -Dsonar.login=$SONAR_TOKEN
-                    '''
+                withSonarQubeEnv('MySonarQube') {
+                    withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                        ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                            -Dsonar.login=$SONAR_TOKEN
+                        '''
+                    }
                 }
             }
         }
