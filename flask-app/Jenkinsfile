@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    sed "s|__IMAGE_TAG__|docker.io/exact84/flask-app:${BUILD_NUMBER}|g" k8s/kaniko-template.yaml > kaniko.yaml
+                    sed "s|__IMAGE_TAG__|docker.io/exact84/flask-app:${BUILD_NUMBER}|g" kaniko.yaml > kaniko.yaml
                     kubectl apply -f kaniko.yaml
                     kubectl wait --for=condition=complete --timeout=300s pod/kaniko-build
                     kubectl logs kaniko-build
