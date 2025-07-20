@@ -3,6 +3,18 @@ kind: Namespace
 metadata:
   name: sonarqube
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonarqube-data
+  namespace: sonarqube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,6 +45,13 @@ spec:
             limits:
               memory: "3072Mi"
               cpu: "1000m"
+          volumeMounts:
+            - name: sonarqube-data
+              mountPath: /opt/sonarqube/data
+      volumes:
+        - name: sonarqube-data
+          persistentVolumeClaim:
+            claimName: sonarqube-data
 ---
 apiVersion: v1
 kind: Service
