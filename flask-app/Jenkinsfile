@@ -154,14 +154,8 @@ kubectl delete pod kaniko-build -n jenkins
         stage('Smoke Test') {
             steps {
                 sh '''
-                for i in {1..12}; do
-                  kubectl get deployment/flask-app-helm -n default && break
-                  echo "Waiting for deployment to appear..."
-                  sleep 5
-                done
-
-                kubectl rollout status deployment/flask-app-helm -n default
-                curl --fail http://$(minikube ip):30202 || echo "App is not reachable"
+                kubectl run curltest --rm -i --restart=Never --image=curlimages/curl -n default -- \
+                  curl --fail http://flask-app-helm:5000
                 '''
             }
         }

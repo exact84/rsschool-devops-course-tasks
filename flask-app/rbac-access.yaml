@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   name: kaniko-rbac-manager
 rules:
-  - apiGroups: [""]  # core API group
+  - apiGroups: [""]
     resources: ["pods", "pods/log", "secrets", "configmaps", "services", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
   - apiGroups: ["apps"]
@@ -12,6 +12,9 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
     verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/attach"]
+    verbs: ["create", "get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
