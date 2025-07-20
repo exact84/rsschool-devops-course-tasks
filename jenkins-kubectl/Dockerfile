@@ -10,4 +10,6 @@ RUN apt-get update \
     && apt-get install -y python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
 USER jenkins

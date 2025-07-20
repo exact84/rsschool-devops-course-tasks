@@ -83,11 +83,26 @@ spec:
                 writeFile file: 'kaniko.yaml', text: kanikoYaml
 
                 sh '''
-                kubectl apply -f kaniko.yaml
-                kubectl wait --for=condition=Ready --timeout=300s pod/kaniko-build
-                kubectl get pod kaniko-build -o jsonpath='{.status.phase}'
-                kubectl delete pod kaniko-build
-                '''
+kubectl apply -f kaniko.yaml
+
+timeout=300
+while [ $timeout -gt 0 ]; do
+  status=$(kubectl get pod kaniko-build -n jenkins -o jsonpath='{.status.phase}')
+  if [ "$status" = "Succeeded" ] || [ "$status" = "Failed" ]; then
+    break
+  fi
+  if [ $((timeout % 30)) -eq 0 ]; then
+    echo "---- Kaniko logs ----"
+    kubectl logs kaniko-build -n jenkins || true
+    echo "---------------------"
+  fi
+  sleep 5
+  timeout=$((timeout-5))
+done
+
+kubectl logs kaniko-build -n jenkins
+kubectl delete pod kaniko-build -n jenkins
+'''
             }
         }
     }
@@ -127,7 +142,9 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                helm upgrade --install myapp . --namespace default \
+                rm -rf venv
+                cd flask-app
+                helm upgrade --install flask-app . --namespace default \
                     --set image.repository=$REGISTRY/$DOCKER_IMAGE \
                     --set image.tag=$DOCKER_TAG
                 '''
@@ -137,8 +154,13 @@ spec:
         stage('Smoke Test') {
             steps {
                 sh '''
-                sleep 10
-                kubectl rollout status deployment/flask-app-helm
+                for i in {1..12}; do
+                  kubectl get deployment/flask-app-helm -n default && break
+                  echo "Waiting for deployment to appear..."
+                  sleep 5
+                done
+
+                kubectl rollout status deployment/flask-app-helm -n default
                 curl --fail http://$(minikube ip):30202 || echo "App is not reachable"
                 '''
             }
