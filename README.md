@@ -1,4 +1,107 @@
-# Application Deployment via Jenkins Pipeline
+# Task 7: Prometheus Deployment on K8s
+
+## Prerequisites
+
+Ensure the following tools and configurations are in place:
+
+Minikube is installed and the local Kubernetes cluster is running:
+
+``` minikube start ```  
+
+kubectl is installed and configured:
+
+``` kubectl get nodes ```  
+
+Helm is installed:
+
+``` helm version ```  
+
+Add the Bitnami Helm repository (required for Prometheus and Grafana charts):
+````
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+````
+
+## Install Prometheus
+
+```
+helm install prometheus bitnami/kube-prometheus --namespace monitoring --create-namespace
+```
+
+ - This will install:
+ - Prometheus server
+ - Node exporter
+ - Kube State Metrics
+ - Alertmanager
+
+You can inspect the Helm values used by running:
+
+``` helm show values bitnami/kube-prometheus ```
+
+Check if all components are running:
+
+``` kubectl get all -n monitoring ```
+
+To access the Prometheus dashboard locally:
+``` kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090 ```
+
+## Install Grafana
+
+Install Grafana in the same monitoring namespace:
+```
+helm install grafana bitnami/grafana \
+  --namespace monitoring \
+  --set admin.password=admin123 \
+  --set service.type=ClusterIP
+```
+Change the admin password (admin123) to a secure one in production environments.
+
+Check if Grafana is running:
+``` kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana ```
+
+To access the Grafana dashboard locally:
+``` kubectl port-forward svc/grafana 3000:3000 -n monitoring ```
+
+## Prometheus Data Source Configuration
+
+Once inside Grafana:
+
+ - Go to Gear (⚙️) → Data Sources
+ - Click Add data source
+ - Select Prometheus
+ - Set the URL to:
+http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+ - Click Save & Test
+
+You should see a success message indicating Grafana can reach Prometheus.
+
+## Dashboard Creation
+
+To quickly get started with a ready-made dashboard for node metrics, you can import a public dashboard from Grafana’s community dashboards.
+
+In Grafana, 
+ - Click the + (Create) button in the sidebar.
+ - Select Import.
+ - In the "Import via grafana.com" field, enter the dashboard ID: 1860.  
+This is the "Node Exporter Full" dashboard commonly used for Kubernetes node metrics.
+ - Click Load.
+ - Select your Prometheus data source when prompted.
+ - Click Import.
+
+## Export Dashboard JSON
+To include the dashboard layout in your repository:
+
+ - Open the dashboard.
+ - Click the gear icon (⚙️) in the top right (Dashboard settings).
+ - Click JSON model.
+ - Click Download JSON or copy and save the contents to a file.
+
+ 
+  
+
+  ---  
+  ---  
+# Task 6: Application Deployment via Jenkins Pipeline
 
 ## Project Structure
 
