@@ -1,0 +1,28 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: custom-alert-rules
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: resource-alerts
+      rules:
+        - alert: HighCPUUsage
+          expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 70
+          for: 0s
+          labels:
+            severity: warning
+          annotations:
+            summary: High CPU usage on {{ $labels.instance }}
+            description: CPU usage is above 70% for more than 1 minute (pr).
+
+        - alert: LowMemoryAvailable
+          expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.25
+          for: 0s
+          labels:
+            severity: critical
+          annotations:
+            summary: Low memory available on {{ $labels.instance }}
+            description: Less than 25% memory available (pr).

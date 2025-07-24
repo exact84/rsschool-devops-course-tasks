@@ -1,0 +1,34 @@
+# Helm values для kube-prometheus-stack с настройкой Grafana SMTP и алертов
+grafana:
+  # SMTP Configuration
+  grafana.ini:
+    smtp:
+      enabled: true
+      host: smtp4dev.monitoring.svc.cluster.local:1025
+      skip_verify: true
+      from_address: grafana-alerts@k8s.local
+      from_name: Grafana K8s Alerts
+      startTLS_policy: NoStartTLS
+    unified_alerting:
+      enabled: true
+    alerting:
+      enabled: false
+
+  # Sidecar для алертов
+  sidecar:
+    alerts:
+      enabled: true
+      label: grafana_alert
+      labelValue: "1"
+    notifiers:
+      enabled: true
+      label: grafana_notifier  
+      labelValue: "1"
+
+  # Дополнительные ConfigMaps для алертов
+  extraConfigmapMounts:
+    - name: grafana-alerting-provisioning
+      mountPath: /etc/grafana/provisioning/alerting/alerting.yaml
+      subPath: alerting.yaml
+      configMap: grafana-alerting-provisioning
+      readOnly: true

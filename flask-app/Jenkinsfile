@@ -1,0 +1,184 @@
+pipeline {
+    triggers {
+        // test2
+        pollSCM('H/5 * * * *')
+    }
+    agent any
+    options {
+        skipDefaultCheckout(true)
+    }
+    environment {
+        DOCKER_IMAGE = "flask-app"
+        DOCKER_TAG = "${BUILD_NUMBER}"
+        REGISTRY = "docker.io/exact84"
+        SONAR_SCANNER_HOME = tool 'SonarScanner'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'task_6', credentialsId: 'github-token', url: 'https://github.com/exact84/rsschool-devops-course-tasks.git'
+            }
+        }
+
+        stage('Setup RBAC') {
+            steps {
+                script {
+                    sh 'kubectl delete pod kaniko-build -n jenkins --ignore-not-found'
+                    def rbacYaml = """
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kaniko-role
+  namespace: jenkins
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kaniko-rolebinding
+  namespace: jenkins
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: jenkins
+roleRef:
+  kind: Role
+  name: kaniko-role
+  apiGroup: rbac.authorization.k8s.io
+"""
+                    writeFile file: 'kaniko-rbac.yaml', text: rbacYaml
+                    sh 'kubectl apply -f kaniko-rbac.yaml'
+                }
+            }
+        }    
+
+    stage('Build and Push Docker Image with Kaniko') {
+        steps {
+            script {
+                def kanikoYaml = """
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kaniko-build
+spec:
+  restartPolicy: Never
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:latest
+      args:
+        - "--dockerfile=flask-app/Dockerfile"
+        - "--context=git://github.com/exact84/rsschool-devops-course-tasks.git#refs/heads/task_6"
+        - "--destination=docker.io/exact84/flask-app:${BUILD_NUMBER}"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker/config.json
+          subPath: .dockerconfigjson
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: docker-config
+"""
+
+                writeFile file: 'kaniko.yaml', text: kanikoYaml
+
+                sh '''
+kubectl apply -f kaniko.yaml
+
+timeout=300
+while [ $timeout -gt 0 ]; do
+  status=$(kubectl get pod kaniko-build -n jenkins -o jsonpath='{.status.phase}')
+  if [ "$status" = "Succeeded" ] || [ "$status" = "Failed" ]; then
+    break
+  fi
+  if [ $((timeout % 30)) -eq 0 ]; then
+    echo "---- Kaniko logs ----"
+    kubectl logs kaniko-build -n jenkins || true
+    echo "---------------------"
+  fi
+  sleep 5
+  timeout=$((timeout-5))
+done
+
+kubectl logs kaniko-build -n jenkins
+kubectl delete pod kaniko-build -n jenkins
+'''
+            }
+        }
+    }
+
+        stage('Test') {
+            steps {
+                sh '''
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r flask-app/requirements.txt
+                pytest flask-app/ || exit 1
+                '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('flask-app-exact')
+            }
+            steps {
+                dir('flask-app') {
+                    withSonarQubeEnv('MySonarQube') {
+                        withCredentials([string(credentialsId: 'flask-app-exact', variable: 'SONAR_TOKEN')]) {
+                            sh 'ls -l'
+                            sh 'cat sonar-project.properties'
+                            sh '''
+                            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                rm -rf venv
+                cd flask-app
+                helm upgrade --install flask-app . --namespace default \
+                    --set image.repository=$REGISTRY/$DOCKER_IMAGE \
+                    --set image.tag=$DOCKER_TAG
+                '''
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                kubectl run curltest --rm -i --restart=Never --image=curlimages/curl -n default -- \
+                  curl --fail http://flask-app-helm:5000
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            emailext(
+                to: 'exact84@gmail.com',
+                subject: "Jenkins build #${BUILD_NUMBER} succeeded",
+                body: "Everything deployed and verified successfully."
+            )
+        }
+        failure {
+            emailext(
+                to: 'exact84@gmail.com',
+                subject: "Jenkins build #${BUILD_NUMBER} failed",
+                body: "Please check the Jenkins console log for details."
+            )
+        }
+    }
+}
