@@ -102,7 +102,7 @@ resource "aws_network_acl_rule" "ingress_icmp" {
   protocol       = "1" # ICMP
   rule_action    = "allow"
   cidr_block     = "10.0.0.0/16"
-  from_port      = -1 // Проблема века решена???
+  from_port      = -1
   to_port        = -1
 }
 
