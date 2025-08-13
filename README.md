@@ -123,3 +123,21 @@ To remove the backend completely, run:
 ```
 make destroy-bootstrap
 ```
+=======
+# Terraform GitHub Actions Infrastructure
+
+## Description
+
+The infrastructure creates:
+- IAM role (`GithubActionsRole`) for GitHub Actions with OIDC
+- CI/CD pipeline via GitHub Actions
+
+---
+
+## Variables  
+defined in `variables.tf` and stored in GitHub Actions secrets
+
+- `role_name` — name of the IAM role for GitHub Actions  
+- `aws_account_id` — AWS account ID  
+- `repo_fullname` — repository in the format `owner/repo`  
+- `aws_region` — AWS region  
