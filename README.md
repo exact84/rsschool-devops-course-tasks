@@ -1,112 +1,128 @@
-
-# Kubernetes Cluster Setup on K3s in AWS
-
-## Project Overview
-This guide outlines the setup of a Kubernetes cluster using K3s, consisting of one master node and one worker node, deployed in separate private subnets within an AWS VPC. Access to the cluster is facilitated through a bastion host located in a public subnet.
-
-## Requirements and Preparation
-
-### 1. Deploy Kubernetes Cluster Infrastructure with Terraform
-The project includes Terraform configurations to create a VPC, private subnets for the master and worker nodes, EC2 instances for the master and worker, a bastion host, and necessary security settings.
-
-Run the following commands:
-
-```
-terraform init
-terraform plan
-terraform apply
-```
-
-### 2. SSH Key for Access
-An SSH key (`k8s-key.pem`) generated during the creation of EC2 instances in AWS is used to connect to the instances.
-
-### 3. Install kubectl on Local Machine (Windows)
-- Install [Chocolatey](https://chocolatey.org/install) if not already installed.
-- Open PowerShell as an administrator and run:
+## Task 4: Jenkins Installation and Configuration
+### Install kubectl
 
 ```
 choco install kubernetes-cli -y
 ```
 
----
-
-## Deploying the Kubernetes Cluster
-
-### 1. Install K3s on the Master Node
-- Copy the SSH key and connect to the master EC2 instance.
-- Set appropriate permissions for the key.
-- Install the K3s server:
-
+### Install & start minikube
+You must install & run Docker before it
 ```
-curl -sfL https://get.k3s.io | sh -s - server
+choco install minikube -y
+minikube start --driver=docker
 ```
 
-- Retrieve the node token:
-
+You can open Kubernetes Dashboard for displaying the cluster management graphical interface
 ```
-sudo cat /var/lib/rancher/k3s/server/node-token
-```
----
-
-### 2. Install K3s Agent on the Worker Node
-- Connect to the worker EC2 instance via SSH.
-- Install the K3s agent, specifying the server URL and token:
-
-```
-curl -sfL https://get.k3s.io | K3S_URL=https://<MASTER_PRIVATE_IP>:6443 K3S_TOKEN=<NODE_TOKEN> sh -s - agent
-```
----
-
-
-## Configuring Cluster Access from Local Machine
-
-### 1. Create an SSH Tunnel via Bastion Host
-Run the following command on your local machine to forward the port to the API server:
-
-```
-ssh -i path\to\k8s-key.pem -L 6443:<MASTER_PRIVATE_IP>:6443 ec2-user@<BASTION_PUBLIC_IP>
+minikube dashboard
 ```
 
-Keep this terminal window open to maintain the tunnel.
-
-### 2. Copy the kubeconfig File
-From the bastion host, retrieve the kubeconfig file from the master node and save it locally:
+### Install helm
 
 ```
-ssh -i path/to/k8s-key.pem ec2-user@<BASTION_PUBLIC_IP> "ssh ec2-user@<MASTER_PRIVATE_IP> 'sudo cat /etc/rancher/k3s/k3s.yaml'" > k3s.yaml
-```
----
-
-
-### 3. Edit the kubeconfig File
-Open `k3s.yaml` in a text editor and update the `clusters.cluster.server` field to:
-
-```
-https://localhost:6443
-```
----
-
-### 4. Set the KUBECONFIG Environment Variable (Windows PowerShell)
-
-```
-$env:KUBECONFIG = "C:\pathTo\k3s.yaml"
-```
----
-
-### 5. Verify Access
-In the same session with the SSH tunnel active, check the list of nodes:
-
-```
-kubectl get nodes
+choco install kubernetes-helm -y
 ```
 
-If the nodes appear with a `Ready` status, the setup is successful.
+### Add the Bitnami Helm chart repository
+```
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+```
 
-## Deploy a Workload
-Deploy a simple nginx application:
+### Deploys an Nginx server with default settings
 
 ```
-kubectl apply -f https://k8s.io/examples/pods/simple-pod.yaml
-kubectl get all --all-namespaces | grep nginx
+helm install my-nginx bitnami/nginx
 ```
----
+You can verify the deployment:
+```
+kubectl get all
+```
+To get a working URL:
+```
+minikube service my-nginx --url
+```
+To run Kubernetes Dashboard
+```
+minikube dashboard
+```
+Uninstall the chart:
+```
+helm uninstall my-nginx
+```
+
+## Prepare the Cluster
+
+Minikube has a built-in provisioner for PV/PVC by default.
+To check the functionality of Dynamic Provisioning:
+```
+kubectl get storageclass
+```
+
+## Jenkins Installation 
+
+Create namespace for Jenkins, add Helm-repository and install Jenkins:
+```
+kubectl create namespace jenkins
+helm repo add jenkins https://charts.jenkins.io
+helm repo update
+helm install jenkins jenkins/jenkins --namespace jenkins
+```
+
+for checking:
+```
+kubectl get pods -n jenkins
+```
+
+recieve password and addres for Jenkins Dashboard in the web browser:
+```
+get secret jenkins -n jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode
+minikube service jenkins --namespace jenkins --url
+```
+
+### Persistent Jenkins Configuration
+
+To verify that Jenkins uses persistent storage:
+
+1. Created a freestyle project `HelloWorld` and ran a build.
+2. Deleted the Jenkins pod:
+
+   ```
+   kubectl delete pod jenkins-0 -n jenkins
+   ```
+After pod restart, Jenkins retained the job and build history.
+
+Jenkins was deployed with a PersistentVolumeClaim named jenkins, automatically provisioned by the Helm chart. This ensures that Jenkins configuration survives pod restarts.
+
+## Authentication and Security
+
+In web-interface:  
+
+ - Manage Jenkins -> Manage Users -> Create User
+ - Manage Jenkins -> Plugins -> Available  
+install "Matrix Authorization Strategy"
+ - Manage Jenkins -> Security  
+in Authorization choose "Matrix-based security"  
+for each user choose permissions  
+
+## JCasC to describe job in Jenkins
+
+Update dependencies:
+```
+helm dependency update .
+```
+
+Install jenkins with job:
+```
+helm install jenkins ./jenkins-chart
+```
+
+Create connection for web-interface:
+```
+kubectl port-forward svc/jenkins 8080:8080
+```
+
+For checking pods:
+```
+kubectl get pods -l app.kubernetes.io/name=jenkins
+```
