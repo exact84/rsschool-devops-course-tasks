@@ -1,0 +1,28 @@
+jenkins:
+  controller:
+    image:
+      tag: "2.452.1"
+      pullPolicy: IfNotPresent
+
+    installPlugins:
+      - job-dsl:1.77
+
+    initScripts:
+      - |
+        import jenkins.model.*
+        import hudson.model.*
+        import hudson.tasks.*
+
+        def existingJob = Jenkins.instance.getItem("hello-world")
+        if (existingJob != null) {
+          existingJob.delete()
+        }
+        
+        def job = new FreeStyleProject(Jenkins.instance, "hello-world")
+        job.description = "Simple Hello World job"
+        def builder = new Shell("echo 'Hello World!'\necho 'Hello World'\necho 'from Alexey Exact'")
+        job.buildersList.add(builder)
+        Jenkins.instance.add(job, "hello-world")
+        job.save()
+        println "Hello World"
+        println "from Alexey Exact"
