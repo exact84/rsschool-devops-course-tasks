@@ -1,128 +1,67 @@
-## Task 4: Jenkins Installation and Configuration
-### Install kubectl
+# Flask App Helm Deployment
 
-```
-choco install kubernetes-cli -y
-```
+## Project Structure
 
-### Install & start minikube
-You must install & run Docker before it
-```
-choco install minikube -y
-minikube start --driver=docker
-```
+- flask-app/
+  - .helmignore
+  - Dockerfile
+  - main.py
+  - Chart.yaml
+  - values.yaml
+  - requirements.txt
+  - templates/
+     - ... (deployment.yaml, service.yaml, etc.)
 
-You can open Kubernetes Dashboard for displaying the cluster management graphical interface
-```
-minikube dashboard
-```
+## Build and Publish Docker Image
 
-### Install helm
-
-```
-choco install kubernetes-helm -y
-```
-
-### Add the Bitnami Helm chart repository
-```
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-```
-
-### Deploys an Nginx server with default settings
-
-```
-helm install my-nginx bitnami/nginx
-```
-You can verify the deployment:
-```
-kubectl get all
-```
-To get a working URL:
-```
-minikube service my-nginx --url
-```
-To run Kubernetes Dashboard
-```
-minikube dashboard
-```
-Uninstall the chart:
-```
-helm uninstall my-nginx
-```
-
-## Prepare the Cluster
-
-Minikube has a built-in provisioner for PV/PVC by default.
-To check the functionality of Dynamic Provisioning:
-```
-kubectl get storageclass
-```
-
-## Jenkins Installation 
-
-Create namespace for Jenkins, add Helm-repository and install Jenkins:
-```
-kubectl create namespace jenkins
-helm repo add jenkins https://charts.jenkins.io
-helm repo update
-helm install jenkins jenkins/jenkins --namespace jenkins
-```
-
-for checking:
-```
-kubectl get pods -n jenkins
-```
-
-recieve password and addres for Jenkins Dashboard in the web browser:
-```
-get secret jenkins -n jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode
-minikube service jenkins --namespace jenkins --url
-```
-
-### Persistent Jenkins Configuration
-
-To verify that Jenkins uses persistent storage:
-
-1. Created a freestyle project `HelloWorld` and ran a build.
-2. Deleted the Jenkins pod:
-
+1. Build the image locally:
+   ```sh
+   docker build -t flask-app:latest ./flask-app
    ```
-   kubectl delete pod jenkins-0 -n jenkins
+2. Load the image into minikube:
+   ```sh
+   minikube image load flask-app:latest
    ```
-After pod restart, Jenkins retained the job and build history.
+3. Push the image to Docker Hub:
+   ```sh
+   docker tag flask-app:latest exact84/flask-app:latest
+   docker push exact84/flask-app:latest
+   ```
 
-Jenkins was deployed with a PersistentVolumeClaim named jenkins, automatically provisioned by the Helm chart. This ensures that Jenkins configuration survives pod restarts.
+## Deploy the Application with Helm
 
-## Authentication and Security
+1. Go to the directory with the Helm chart:
+   ```sh
+   cd flask-app
+   ```
+2. Install the application:
+   ```sh
+   helm install flask-app .
+   ```
+   To upgrade:
+   ```sh
+   helm upgrade flask-app .
+   ```
 
-In web-interface:  
+## Accessing the Application
 
- - Manage Jenkins -> Manage Users -> Create User
- - Manage Jenkins -> Plugins -> Available  
-install "Matrix Authorization Strategy"
- - Manage Jenkins -> Security  
-in Authorization choose "Matrix-based security"  
-for each user choose permissions  
+- **Recommended way for minikube:**
+  ```sh
+  minikube service flask-app
+  ```
+  This command will open a browser with the working address (e.g., http://127.0.0.1:63546/).
 
-## JCasC to describe job in Jenkins
+- **NodePort (e.g., http://192.168.49.2:30202/):**
+  May not be accessible from outside the minikube VM on Windows/Mac. This is a minikube limitation, not your configuration.
 
-Update dependencies:
+## Uninstall the Application
+
+```sh
+helm uninstall flask-app
 ```
-helm dependency update .
-```
 
-Install jenkins with job:
-```
-helm install jenkins ./jenkins-chart
-```
-
-Create connection for web-interface:
-```
-kubectl port-forward svc/jenkins 8080:8080
-```
-
-For checking pods:
-```
-kubectl get pods -l app.kubernetes.io/name=jenkins
-```
+## Notes
+- For production, it is recommended to:
+   - Store the image in a public registry (e.g., DockerHub).
+   - Update values.yaml to set image.repository: exact84/flask-app and image.tag: latest.
+- The application is built with Flask and runs in development mode (suitable for demo, not for production).
