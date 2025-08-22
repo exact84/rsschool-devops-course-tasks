@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smtp4dev
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smtp4dev
+  template:
+    metadata:
+      labels:
+        app: smtp4dev
+    spec:
+      containers:
+        - name: smtp4dev
+          image: rnwood/smtp4dev
+          args:
+            - --smtpport=1025
+          ports:
+            - containerPort: 80
+            - containerPort: 25
+            - containerPort: 1025
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smtp4dev
+  namespace: monitoring
+spec:
+  selector:
+    app: smtp4dev
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: smtp
+      port: 1025
+      targetPort: 1025

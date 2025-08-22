@@ -1,0 +1,121 @@
+pipeline {
+    agent any
+
+    environment {
+        KUBE_NAMESPACE = 'monitoring'
+        GRAFANA_SERVICE = 'prometheus-grafana'
+        GRAFANA_URL = "http://${GRAFANA_SERVICE}.${KUBE_NAMESPACE}.svc.cluster.local:3000"
+    }
+
+    stages {
+        stage('Helm Repo Setup') {
+            steps {
+                sh '''
+                    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+                    helm repo add grafana https://grafana.github.io/helm-charts
+                    helm repo update
+                '''
+            }
+        }
+        stage('Install Prometheus') {
+            steps {
+                sh '''
+                    helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+                      --namespace $KUBE_NAMESPACE --create-namespace
+                '''
+            }
+        }
+        stage('Install Grafana') {
+            steps {
+                sh '''
+                    helm upgrade --install grafana grafana/grafana \
+                      --namespace $KUBE_NAMESPACE \
+                      --set admin.password=admin123 \
+                      --set service.type=ClusterIP \
+                      --set persistence.enabled=true \
+                      --set persistence.size=1Gi \
+                      --set grafana.ini.server.root_url="http://localhost:3000/" \
+                      --set grafana.ini.auth.anonymous.enabled=true
+                '''
+            }
+        }
+        stage('Apply SMTP4Dev Config') {
+            steps {
+                sh 'kubectl apply -f monitoring/prometheus/smtp4dev.yaml'
+            }
+        }
+        stage('Apply Prometheus Alert Rules') {
+            steps {
+                sh 'kubectl apply -f monitoring/prometheus/alert-rules.yaml'
+            }
+        }
+        stage('Apply Alertmanager Values') {
+            steps {
+                sh 'kubectl apply -f monitoring/prometheus/alertmanager-values.yaml'
+            }
+        }
+        stage('Apply Grafana Alerting Config') {
+            steps {
+                sh 'kubectl apply -f monitoring/grafana/grafana-unified-alerting.yaml'
+            }
+        }
+        stage('Update Prometheus Stack Values') {
+            steps {
+                sh '''
+                    helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+                      --namespace $KUBE_NAMESPACE \
+                      --values monitoring/grafana/prometheus-stack-values.yaml \
+                      --reuse-values
+                '''
+            }
+        }
+        stage('Restart Grafana Deployment') {
+            steps {
+                sh 'kubectl rollout restart deploy prometheus-grafana -n $KUBE_NAMESPACE'
+                sh 'sleep 45'
+            }
+        }
+        stage('Setup Port Forwards') {
+            steps {
+                sh '''
+                    kubectl -n monitoring port-forward svc/prometheus-grafana 3000:3000 &
+                    sleep 10
+                '''
+            }
+        }
+        stage('Configure Prometheus Data Source') {
+            steps {
+                sh 'sleep 45'
+                sh """
+                    curl -X POST ${GRAFANA_URL}/api/datasources \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "name":"Prometheus",
+                        "type":"prometheus",
+                        "url":"http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
+                        "access":"proxy"
+                    }'
+                """
+            }
+        }
+        stage('Import Node Exporter Dashboard') {
+            steps {
+                sh """
+                    curl -X POST ${GRAFANA_URL}/api/dashboards/import \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "dashboard": { "id": 1860 },
+                        "inputs": [{"name": "DS_PROMETHEUS", "type": "datasource", "pluginId": "prometheus", "value": "Prometheus"}]
+                    }'
+                """
+            }
+        }
+    }
+    post {
+        always {
+            mail to: 'exact84@gmail.com',
+                 subject: "Jenkins Pipeline Finished: ${currentBuild.fullDisplayName}",
+                 body: "Status: ${currentBuild.currentResult}"
+        }
+    }
+}
